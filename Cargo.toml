@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 decimal = "2.1.0"
+num-complex = "0.4.3"

@@ -1,8 +1,8 @@
 
 use std::ops::{Add, Sub, Neg, Mul, Div, BitXor};
-use std::fmt;
+use std::{fmt, num};
 
-use decimal::d128;
+use num_complex::Complex64;
 
 //TODO
 //  minterm simplification
@@ -14,155 +14,119 @@ use decimal::d128;
 //      chain rule
 //      tree structure
 
+/*macro_rules! matlarb {
+    (syms $e:expr) => {
+        {
+            let val: usize = $e; // Force types to be integers
+            println!("{} = {}", stringify!{$e}, val);
+        }
+    };
+}*/
 
-macro_rules! sym {
+macro_rules! symlit {
     ($ex: expr) => {
-        ($ex).sym()
+        Sym::Constant(Complex64{
+            re: ($ex),
+            im: (0 as f64),  
+            }
+        )
+    };
+
+    ($re: expr, $im: expr) => {
+        Sym::Constant(Complex64{
+            re: ($re),
+            im: ($im),  
+            }
+        )
+    };
+
+}
+macro_rules! symvar {
+    ($ex: expr) => {
+        Sym::Var(($ex).to_string())
     };
 }
 
 fn main() {
-    let one = sym!(1);
-    let two = sym!(2.5);
-    let x_str: String = "x".to_string();
-    let x = Sym::Var(x_str);
+    let complex_1 = symlit!(12., 1.);
+    let complex_2 = symlit!(12., -1.);
+    let one = symlit!(1.);
+    let two = symlit!(2.);
+    let x = symvar!("x");
     let one_half = one.clone() / two.clone();
     let root_two = two.clone() ^ one_half.clone();
-    let root_two_decimal = root_two.decimal();
-    let root_two_x = root_two / x;
-    println!("{}", d128::from((2.5)));
-}
-
-trait TypeInfo {
-    fn type_of(&self) -> &'static str {
-        "other"
-    }
-    fn sym(&self) -> Sym;
-}
-impl TypeInfo for i32 {
-    fn type_of(&self) -> &'static str {
-        "i32"
-    }
-    fn sym(&self) -> Sym {
-        Sym::Constant(d128::from((*self)))
-    }
-}
-impl TypeInfo for i64 {
-    fn type_of(&self) -> &'static str {
-        "i64"
-    }
-    fn sym(&self) -> Sym {
-        Sym::Constant(d128::from((*self)))
-    }
-}
-impl TypeInfo for isize {
-    fn type_of(&self) -> &'static str {
-        "isize"
-    }
-    fn sym(&self) -> Sym {
-        Sym::Constant(d128::from((*self) as i64))
-    }
-}
-impl TypeInfo for u32 {
-    fn type_of(&self) -> &'static str {
-        "u32"
-    }
-    fn sym(&self) -> Sym {
-        Sym::Constant(d128::from((*self)))
-    }
-}
-impl TypeInfo for u64 {
-    fn type_of(&self) -> &'static str {
-        "u64"
-    }
-    fn sym(&self) -> Sym {
-        Sym::Constant(d128::from((*self)))
-    }
-}
-impl TypeInfo for usize {
-    fn type_of(&self) -> &'static str {
-        "usize"
-    }
-    fn sym(&self) -> Sym {
-        Sym::Constant(d128::from((*self) as u64))
-    }
-}
-impl TypeInfo for f32 {
-    fn type_of(&self) -> &'static str {
-        "f32"
-    }
-    fn sym(&self) -> Sym {
-        let val = *self;
-        Sym::Constant(f32::From((*self)))
-        //Sym::Constant(d128!(val))
-    }
-}
-impl TypeInfo for f64 {
-    fn type_of(&self) -> &'static str {
-        "f64"
-    }
-    fn sym(&self) -> Sym {
-        let val = *self;
-        Sym::Constant(d128::From((*self)))
-        //Sym::Constant(d128!(val))
-    }
-}
-impl TypeInfo for &str {
-    fn type_of(&self) -> &'static str {
-        "&str"
-    }
-    fn sym(&self) -> Sym {
-        Sym::Var((self).to_string().clone())
-    }
-}
-impl TypeInfo for String {
-    fn type_of(&self) -> &'static str {
-        "String"
-    }
-    fn sym(&self) -> Sym {
-        Sym::Var(self.clone())
-    }
+    //let root_two_decimal = root_two.decimal();
+    let root_two_x = root_two.clone() / x.clone();
+    println!("{} ", (complex_1*complex_2*x).decimal());
 }
 
 
 trait Symbolic {
+    fn is_constant(&self) -> bool;
+    fn decimal(&self) -> Sym;
+    fn evaluate(&self) -> Sym;
+}
 
-    fn eval(&self) -> Sym {
-        return Sym::Constant(d128!(0));
-    }
+trait Complex {
+    fn is_imag(&self) -> bool;
+    fn is_real(&self) -> bool;
 
-    fn decimal(&self) -> Sym {
-        return Sym::Constant(d128!(0));
-    }
+    fn abs(&self) -> Complex64;
+    fn angle(&self) -> Complex64;
+}
 
-    fn subs(&self, val: Sym) -> Sym {
-        return Sym::Constant(d128!(0));
-    }
-
+#[derive(Clone, PartialEq)]
+enum Func {
+    Sum(Box<Sym>, Box<Sym>),
+    Neg(Box<Sym>),
+    Mult(Box<Sym>, Box<Sym>),
+    Inv(Box<Sym>),
+    Pow(Box<Sym>, Box<Sym>),
+    Ln(Box<Sym>),
+    Exp(Box<Sym>),
+    Sin(Box<Sym>),
+    SinInv(Box<Sym>),
+    Cos(Box<Sym>),
+    CosInv(Box<Sym>),
 }
 
 #[derive(Clone, PartialEq)]
 enum Sym {
-    Constant(d128),
+    Constant(Complex64),
     Var(String),
-    Neg(Box<Sym>),
-    Sum((Box<Sym>, Box<Sym>)),
-    Mult((Box<Sym>, Box<Sym>)),
-    Div((Box<Sym>, Box<Sym>)),
-    Exp((Box<Sym>, Box<Sym>))
+    Fun(Func)
 }
 
 impl Symbolic for Sym {
 
-    fn eval(&self) -> Sym {
+    fn is_constant(&self) -> bool {
+        match self {
+            Sym::Constant(_) => true,
+            Sym::Var(_) => false,
+            Sym::Fun(fun) => false
+        }
+    }
+
+    fn evaluate(&self) -> Sym {
         match self {
             Sym::Constant(_) => return (*self).clone(),
             Sym::Var(_) => return (*self).clone(),
-            Sym::Sum((sym_left, sym_right)) => return (*(*sym_left)).eval() + (*(*sym_right)).eval(),
-            Sym::Mult((sym_left, sym_right)) => return (*(*sym_left)).eval() * (*(*sym_right)).eval(),
-            Sym::Div((sym_left, sym_right)) => return (*(*sym_left)).eval() - (*(*sym_right)).eval(),
-            Sym::Exp((sym_left, sym_right)) => (*(*sym_left)).eval() ^ (*(*sym_right)).eval(),
-            Sym::Neg(_) => return -(*self).clone(),
+            Sym::Fun(fun) => {
+                match *fun {
+                    Func::Sum(_, _) => todo!(),
+                    Func::Neg(_) => todo!(),
+                    Func::Mult(_, _) => todo!(),
+                    Func::Inv(_) => todo!(),
+                    Func::Pow(_, _) => todo!(),
+                    Func::Ln(_) => todo!(),
+                    Func::Exp(_) => todo!(),
+                    Func::Sin(_) => todo!(),
+                    Func::SinInv(_) => todo!(),
+                    Func::Cos(_) => todo!(),
+                    Func::CosInv(_) => todo!(),
+                }
+            },
+            
         }
     }
 
@@ -171,154 +135,133 @@ impl Symbolic for Sym {
         match self {
             Sym::Constant(_) => return (*self).clone(),
             Sym::Var(_) => return (*self).clone(),
-            Sym::Sum((sym_left, sym_right)) => {
-                let sym_left_dec = sym_left.decimal(); 
-                let sym_right_dec = sym_right.decimal();
-                if matches!(sym_left_dec, Sym::Constant(_)) && matches!(sym_right_dec, Sym::Constant(_)) {
-                    let mut val_left: d128 = d128!(0);
-                    let mut val_right: d128 = d128!(0);
-                    match sym_left_dec {
-                        Sym::Constant(val_left_temp) => val_left = val_left_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-                    match sym_right_dec {
-                        Sym::Constant(val_right_temp) => val_right = val_right_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-                    return Sym::Constant(val_left + val_right);
-                } else {
-                    return sym_left_dec + sym_right_dec;
+            Sym::Fun(fun) => {
+                match fun {
+                    Func::Sum(a, b) => if (*a).is_constant() && (*b).is_constant() {
+                        let mut a_val: Complex64; 
+                        let mut b_val: Complex64;
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        match **b {
+                            Sym::Constant(b_val_temp) => b_val = b_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val + b_val);
+                    } else {a.decimal() + b.decimal()},
+                    Func::Neg(a) =>  if (*a).is_constant(){
+                        let mut a_val: Complex64; 
+                        let mut b_val: Complex64;
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(-a_val);
+                    } else {(-(**a).clone()).decimal()},
+                    Func::Mult(a, b) =>  if (*a).is_constant() && (*b).is_constant() {
+                        let mut a_val: Complex64; 
+                        let mut b_val: Complex64;
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        match **b {
+                            Sym::Constant(b_val_temp) => b_val = b_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val * b_val);
+                    } else {a.decimal() * b.decimal()},
+                    Func::Inv(a) => if (*a).is_constant(){
+                        let mut a_val: Complex64; 
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(Complex64{
+                            re: (1.),
+                            im: (0.),   
+                            } / a_val);
+                    } else {symlit!(1.)/((*a).decimal())},
+                    Func::Pow(a, b) => if (*a).is_constant() && (*b).is_constant() {
+                        let mut a_val: Complex64; 
+                        let mut b_val: Complex64;
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        match **b {
+                            Sym::Constant(b_val_temp) => b_val = b_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val.powc(b_val));
+                    } else {a.decimal() ^ b.decimal()},
+                    Func::Ln(a) => if (*a).is_constant(){
+                        let mut a_val: Complex64; 
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val.ln());
+                    } else {Sym::Fun(Func::Ln(Box::new((*a).decimal())))},
+                    Func::Exp(a) => if (*a).is_constant(){
+                        let mut a_val: Complex64; 
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val.exp());
+                    } else {Sym::Fun(Func::Exp(Box::new((*a).decimal())))},
+                    Func::Sin(a) => if (*a).is_constant(){
+                        let mut a_val: Complex64; 
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val.sin());
+                    } else {Sym::Fun(Func::Sin(Box::new((*a).decimal())))},
+                    Func::SinInv(a) => if (*a).is_constant(){
+                        let mut a_val: Complex64; 
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val.asin());
+                    } else {Sym::Fun(Func::SinInv(Box::new((*a).decimal())))},
+                    Func::Cos(a) => if (*a).is_constant(){
+                        let mut a_val: Complex64; 
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val.cos());
+                    } else {Sym::Fun(Func::Cos(Box::new((*a).decimal())))},
+                    Func::CosInv(a) => if (*a).is_constant(){
+                        let mut a_val: Complex64; 
+                        match **a {
+                            Sym::Constant(a_val_temp) => a_val = a_val_temp,
+                            Sym::Var(_) => todo!(),
+                            Sym::Fun(_) => todo!(),
+                        }
+                        return Sym::Constant(a_val.acos());
+                    } else {Sym::Fun(Func::CosInv(Box::new((*a).decimal())))},
                 }
             },
-            Sym::Mult((sym_left, sym_right)) => {
-                let sym_left_dec = sym_left.decimal(); 
-                let sym_right_dec = sym_right.decimal();
-                if matches!(sym_left_dec, Sym::Constant(_)) && matches!(sym_right_dec, Sym::Constant(_)) {
-                    let mut val_left: d128 = d128!(0);
-                    let mut val_right: d128 = d128!(0);
-                    match sym_left_dec {
-                        Sym::Constant(val_left_temp) => val_left = val_left_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-                    match sym_right_dec {
-                        Sym::Constant(val_right_temp) => val_right = val_right_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-                    return Sym::Constant(val_left * val_right);
-                } else {
-                    return sym_left_dec * sym_right_dec;
-                }
-            },
-            Sym::Div((sym_left, sym_right)) => {
-                let sym_left_dec = sym_left.decimal(); 
-                let sym_right_dec = sym_right.decimal();
-                if matches!(sym_left_dec, Sym::Constant(_)) && matches!(sym_right_dec, Sym::Constant(_)) {
-                    let mut val_left: d128 = d128!(0);
-                    let mut val_right: d128 = d128!(0);
-                    match sym_left_dec {
-                        Sym::Constant(val_left_temp) => val_left = val_left_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-                    match sym_right_dec {
-                        Sym::Constant(val_right_temp) => val_right = val_right_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-                    return Sym::Constant(val_left / val_right);
-                } else {
-                    return sym_left_dec / sym_right_dec;
-                }
-            },
-            Sym::Exp((sym_left, sym_right)) => {
-                let sym_left_dec = sym_left.decimal(); 
-                let sym_right_dec = sym_right.decimal();
-                if matches!(sym_left_dec, Sym::Constant(_)) && matches!(sym_right_dec, Sym::Constant(_)) {
-                    let mut val_left: d128 = d128!(0);
-                    let mut val_right: d128 = d128!(0);
-                    match sym_left_dec {
-                        Sym::Constant(val_left_temp) => val_left = val_left_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-                    match sym_right_dec {
-                        Sym::Constant(val_right_temp) => val_right = val_right_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-                    return Sym::Constant(val_left.pow(val_right));
-                } else {
-                    return sym_left_dec ^ sym_right_dec;
-                }
-            },
-            Sym::Neg(sym) => {
-                if matches!(**sym, Sym::Constant(_)) {
-                    let mut val: d128 = d128!(0);
-                    match **sym {
-                        Sym::Constant(val_temp) => val = val_temp,
-                        Sym::Var(_) => todo!(),
-                        Sym::Neg(_) => todo!(),
-                        Sym::Sum(_) => todo!(),
-                        Sym::Mult(_) => todo!(),
-                        Sym::Div(_) => todo!(),
-                        Sym::Exp(_) => todo!(),
-                    }
-
-                    return Sym::Constant(-val);
-                } else {
-                    return Sym::Neg((*sym).clone());
-                }
-            }
+            
         }
-    }
-
-    fn subs(&self, val: Sym) -> Sym {
-        match *self {
-            Sym::Constant(val) => return (*self).clone(),
-            Sym::Var(_) => todo!(),
-            Sym::Neg(_) => todo!(),
-            Sym::Sum(_) => todo!(),
-            Sym::Mult(_) => todo!(),
-            Sym::Div(_) => todo!(),
-            Sym::Exp(_) => todo!(),
-        }
-        return Sym::Constant(d128!(0));
     }
 }
 
@@ -326,7 +269,7 @@ impl Add for Sym {
     type Output = Self;
 
     fn add(self: Self, other: Self) -> Self::Output {
-        Sym::Sum((Box::new(self), Box::new(other)))
+        Sym::Fun(Func::Sum(Box::new(self), Box::new(other)))
     }
 }
 
@@ -334,7 +277,7 @@ impl Sub for Sym {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
-        (self + Sym::Neg(Box::new(other)))
+        (self + Sym::Fun(Func::Neg(Box::new(other))))
     }
 }
 
@@ -342,7 +285,7 @@ impl Neg for Sym {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Sym::Neg(Box::new(self))
+        Sym::Fun(Func::Neg(Box::new(self)))
     }
 }
 
@@ -350,7 +293,7 @@ impl Mul for Sym {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self::Output {
-        Sym::Mult((Box::new(self), Box::new(other)))
+        Sym::Fun(Func::Mult(Box::new(self), Box::new(other)))
     }
 }
 
@@ -358,7 +301,7 @@ impl Div for Sym {
     type Output = Self;
 
     fn div(self, other: Self) -> Self::Output {
-        Sym::Div((Box::new(self), Box::new(other)))
+        Sym::Fun(Func::Mult(Box::new(self), Box::new(Sym::Fun(Func::Inv(Box::new(other))))))
     }
 }
 
@@ -366,7 +309,7 @@ impl BitXor for Sym {
     type Output = Self;
 
     fn bitxor(self, other: Self) -> Self::Output {
-        Sym::Exp((Box::new(self), Box::new(other)))
+        Sym::Fun(Func::Pow(Box::new(self), Box::new(other)))
     }
 }
 
@@ -381,26 +324,23 @@ impl fmt::Display for Sym {
 fn format_wrapper(sym: Sym) -> String {
     match sym {
         Sym::Constant(val) => return val.to_string(),
+
         Sym::Var(val) => return val,
-        Sym::Neg(val) => {
-            let mut out = "".to_string();
-            return out + "-(" + &format_wrapper(*val) + ")";
-        },
-        Sym::Sum((val_left, val_right)) => {
-            let mut out = "".to_string();
-            return out + "(" + &format_wrapper(*val_left) + " + " + &format_wrapper(*val_right) + ")";
-        },
-        Sym::Mult((val_left, val_right)) => {
-            let mut out = "".to_string();
-            return out + "(" + &format_wrapper(*val_left) + " * " + &format_wrapper(*val_right) + ")";
-        },
-        Sym::Div((val_left, val_right)) => {
-            let mut out = "".to_string();
-            return out + "(" + &format_wrapper(*val_left) + " / " + &format_wrapper(*val_right) + ")";
-        },
-        Sym::Exp((val_left, val_right)) => {
-            let mut out = "".to_string();
-            return out + "(" + &format_wrapper(*val_left) + " ^ " + &format_wrapper(*val_right) + ")";
+        Sym::Fun(fun) => {
+            let out = "".to_string();
+            match fun {
+                Func::Sum(a, b) => return out + "(" + &format_wrapper(*a) + " + " + &format_wrapper(*b) + ")",
+                Func::Neg(a) => return out + "-" + &format_wrapper(*a),
+                Func::Mult(a, b) => return out + "(" + &format_wrapper(*a) + " * " + &format_wrapper(*b) + ")",
+                Func::Inv(a) => return out + "(1 / " + &format_wrapper(*a) + ")",
+                Func::Pow(a, b) => return out + "(" + &format_wrapper(*a) + " ^ " + &format_wrapper(*b) + ")",
+                Func::Ln(a) => return out + "ln(" + &format_wrapper(*a) + ")",
+                Func::Exp(a) => return out + "exp(" + &format_wrapper(*a) + ")",
+                Func::Sin(a) => return out + "sin(" + &format_wrapper(*a) + ")",
+                Func::SinInv(a) => return out + "arcsin(" + &format_wrapper(*a) + ")",
+                Func::Cos(a) => return out + "cos(" + &format_wrapper(*a) + ")",
+                Func::CosInv(a) => return out + "arccos(" + &format_wrapper(*a) + ")",
+            }
         },
     };
 }
