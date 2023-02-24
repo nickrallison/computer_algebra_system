@@ -1,5 +1,5 @@
 
-use std::ops::{Add, Sub, Neg, Mul, Div, BitXor, Deref};
+use std::ops::{Add, Sub, Neg, Mul, Div, BitXor};
 use std::fmt;
 
 use decimal::d128;
@@ -10,21 +10,123 @@ use decimal::d128;
 //  subs    
 //  fixing braces
 //  calculus
-//  limits
+//      limits
+//      chain rule
+//      tree structure
+
+
+macro_rules! sym {
+    ($ex: expr) => {
+        ($ex).sym()
+    };
+}
 
 fn main() {
-    let one = Sym::Constant(d128!(1));
-    let two = Sym::Constant(d128!(2));
-    let x = Sym::Var("x".to_string());
+    let one = sym!(1);
+    let two = sym!(2.5);
+    let x_str: String = "x".to_string();
+    let x = Sym::Var(x_str);
     let one_half = one.clone() / two.clone();
     let root_two = two.clone() ^ one_half.clone();
     let root_two_decimal = root_two.decimal();
     let root_two_x = root_two / x;
-    println!("{}", root_two_x.decimal());
+    println!("{}", d128::from((2.5)));
+}
+
+trait TypeInfo {
+    fn type_of(&self) -> &'static str {
+        "other"
+    }
+    fn sym(&self) -> Sym;
+}
+impl TypeInfo for i32 {
+    fn type_of(&self) -> &'static str {
+        "i32"
+    }
+    fn sym(&self) -> Sym {
+        Sym::Constant(d128::from((*self)))
+    }
+}
+impl TypeInfo for i64 {
+    fn type_of(&self) -> &'static str {
+        "i64"
+    }
+    fn sym(&self) -> Sym {
+        Sym::Constant(d128::from((*self)))
+    }
+}
+impl TypeInfo for isize {
+    fn type_of(&self) -> &'static str {
+        "isize"
+    }
+    fn sym(&self) -> Sym {
+        Sym::Constant(d128::from((*self) as i64))
+    }
+}
+impl TypeInfo for u32 {
+    fn type_of(&self) -> &'static str {
+        "u32"
+    }
+    fn sym(&self) -> Sym {
+        Sym::Constant(d128::from((*self)))
+    }
+}
+impl TypeInfo for u64 {
+    fn type_of(&self) -> &'static str {
+        "u64"
+    }
+    fn sym(&self) -> Sym {
+        Sym::Constant(d128::from((*self)))
+    }
+}
+impl TypeInfo for usize {
+    fn type_of(&self) -> &'static str {
+        "usize"
+    }
+    fn sym(&self) -> Sym {
+        Sym::Constant(d128::from((*self) as u64))
+    }
+}
+impl TypeInfo for f32 {
+    fn type_of(&self) -> &'static str {
+        "f32"
+    }
+    fn sym(&self) -> Sym {
+        let val = *self;
+        Sym::Constant(f32::From((*self)))
+        //Sym::Constant(d128!(val))
+    }
+}
+impl TypeInfo for f64 {
+    fn type_of(&self) -> &'static str {
+        "f64"
+    }
+    fn sym(&self) -> Sym {
+        let val = *self;
+        Sym::Constant(d128::From((*self)))
+        //Sym::Constant(d128!(val))
+    }
+}
+impl TypeInfo for &str {
+    fn type_of(&self) -> &'static str {
+        "&str"
+    }
+    fn sym(&self) -> Sym {
+        Sym::Var((self).to_string().clone())
+    }
+}
+impl TypeInfo for String {
+    fn type_of(&self) -> &'static str {
+        "String"
+    }
+    fn sym(&self) -> Sym {
+        Sym::Var(self.clone())
+    }
 }
 
 
 trait Symbolic {
+
     fn eval(&self) -> Sym {
         return Sym::Constant(d128!(0));
     }
