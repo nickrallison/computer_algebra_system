@@ -9,6 +9,8 @@ use decimal::d128;
 //      gather like terms
 //  subs    
 //  fixing braces
+//  calculus
+//  limits
 
 fn main() {
     let one = Sym::Constant(d128!(1));
