@@ -15,42 +15,21 @@ use num_complex::Complex64;
 //      tree structure
 // polynomial func
 
-#[macro_export] macro_rules! symlit {
-    ($ex: expr, &ty: expr) => {
-        Sym::Constant(num_complex::Complex64{
-            re: ($ex),
-            im: (0 as f64),  
-            }
-        )
-    };
-
-    ($re: expr, $im: expr, &ty: expr) => {
-        Sym::New(num_complex::Complex64{
-            re: ($re),
-            im: ($im),  
-            }
-        )
-    };
-
-}
-
 #[macro_export] macro_rules! sym {
     ($ex: expr) => {
-        expr.into();
-    };
-
-    ($real: expr, $imag: expr) => {
-        num_complex::Complex64{
-            re: ($real),
-            im: ($imag),  
-        }.into();
+        ($ex).into_sym();
     };
 
 }
-#[macro_export] macro_rules! symvar {
-    ($ex: expr) => {
-        Sym::Var(($ex).to_string())
+
+#[macro_export] macro_rules! complex {
+    ($real: expr, $imag: expr) => {
+        Complex64{
+            re: ($real) as f64,
+            im: ($imag) as f64,
+        }
     };
+
 }
 
 #[derive(Clone, PartialEq)]
@@ -93,11 +72,11 @@ pub trait Symbolic {
 }
 
 pub trait SymbolicHelper {
-    fn into(&self) -> Sym;
+    fn into_sym(&self) -> Sym;
 }
 
 impl SymbolicHelper for &str {
-    fn into(&self) -> Sym {
+    fn into_sym(&self) -> Sym {
         Sym::Minterm(
             Complex64{
                 re: 1.,
@@ -114,14 +93,14 @@ impl SymbolicHelper for &str {
 }
 
 impl SymbolicHelper for String {
-    fn into(&self) -> Sym {
+    fn into_sym(&self) -> Sym {
         Sym::Minterm(
             Complex64{
                 re: 1.,
                 im: 0.,
             }, 
             vec![(
-                Sym::Var(*self),  
+                Sym::Var((*self).clone()),  
                 Complex64{
                     re: 1.,
                     im: 0.,
@@ -131,7 +110,7 @@ impl SymbolicHelper for String {
 }
 
 impl SymbolicHelper for i64 {
-    fn into(&self) -> Sym {
+    fn into_sym(&self) -> Sym {
         Sym::Minterm(
             Complex64{
                 re: (*self as f64),
@@ -142,7 +121,7 @@ impl SymbolicHelper for i64 {
     }
 }
 impl SymbolicHelper for u64 {
-    fn into(&self) -> Sym {
+    fn into_sym(&self) -> Sym {
         Sym::Minterm(
             Complex64{
                 re: (*self as f64),
@@ -153,7 +132,7 @@ impl SymbolicHelper for u64 {
     }
 }
 impl SymbolicHelper for f64 {
-    fn into(&self) -> Sym {
+    fn into_sym(&self) -> Sym {
         Sym::Minterm(
             Complex64{
                 re: (*self),
@@ -164,7 +143,7 @@ impl SymbolicHelper for f64 {
     }
 }
 impl SymbolicHelper for Complex64 {
-    fn into(&self) -> Sym {
+    fn into_sym(&self) -> Sym {
         Sym::Minterm(
             *self, 
             Vec::new()
@@ -180,42 +159,42 @@ impl Add for Sym {
     type Output = Self;
 
     fn add(self: Self, other: Self) -> Self::Output {
-        
+        todo!();
     }
 }
 impl Sub for Sym {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
-        (self + Sym::Fun(Func::Neg(Box::new(other))))
+        todo!();//(self + Sym::Fun(Func::Neg(Box::new(other))))
     }
 }
 impl Neg for Sym {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        Sym::Fun(Func::Neg(Box::new(self)))
+        todo!();//Sym::Fun(Func::Neg(Box::new(self)))
     }
 }
 impl Mul for Sym {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self::Output {
-        Sym::Fun(Func::Mult(Box::new(self), Box::new(other)))
+        todo!();//Sym::Fun(Func::Mult(Box::new(self), Box::new(other)))
     }
 }
 impl Div for Sym {
     type Output = Self;
 
     fn div(self, other: Self) -> Self::Output {
-        Sym::Fun(Func::Mult(Box::new(self), Box::new(Sym::Fun(Func::Inv(Box::new(other))))))
+        todo!();//Sym::Fun(Func::Mult(Box::new(self), Box::new(Sym::Fun(Func::Inv(Box::new(other))))))
     }
 }
 impl BitXor for Sym {
     type Output = Self;
 
     fn bitxor(self, other: Self) -> Self::Output {
-        Sym::Fun(Func::Pow(Box::new(self), Box::new(other)))
+        todo!();//Sym::Fun(Func::Pow(Box::new(self), Box::new(other)))
     }
 }
 impl fmt::Display for Sym {
@@ -242,21 +221,15 @@ fn format_wrapper(sym: Sym) -> String {
 
 
         Sym::Var(val) => return val,
-        Sym::Fun(fun) => {
-            let out = "".to_string();
-            match fun {
-                Func::Sum(a, b) => return out + "(" + &format_wrapper(*a) + " + " + &format_wrapper(*b) + ")",
-                Func::Neg(a) => return out + "-" + &format_wrapper(*a),
-                Func::Mult(a, b) => return out + "(" + &format_wrapper(*a) + " * " + &format_wrapper(*b) + ")",
-                Func::Inv(a) => return out + "(1 / " + &format_wrapper(*a) + ")",
-                Func::Pow(a, b) => return out + "(" + &format_wrapper(*a) + " ^ " + &format_wrapper(*b) + ")",
-                Func::Ln(a) => return out + "ln(" + &format_wrapper(*a) + ")",
-                Func::Exp(a) => return out + "exp(" + &format_wrapper(*a) + ")",
-                Func::Sin(a) => return out + "sin(" + &format_wrapper(*a) + ")",
-                Func::SinInv(a) => return out + "arcsin(" + &format_wrapper(*a) + ")",
-                Func::Cos(a) => return out + "cos(" + &format_wrapper(*a) + ")",
-                Func::CosInv(a) => return out + "arccos(" + &format_wrapper(*a) + ")",
-            }
-        },
+        Sym::Fun => todo!(),
+        Sym::Minterm(_, _) => todo!(),
+        Sym::Polynomial(_) => todo!(),
     };
+}
+
+fn new_complex(real: f64, imag: f64) -> Complex64 {
+    Complex64{
+        re: real,
+        im: imag,
+    }
 }
